@@ -1,9 +1,5 @@
-class Cat {
-  speak() {
-    return 'meow'
-  }
-}
+import Game from './game'
 
-const el = document.createElement('div')
-el.innerHTML  = new Cat().speak()
-document.body.appendChild(el)
+
+const game = new Game()
+game.runGameLoop()
