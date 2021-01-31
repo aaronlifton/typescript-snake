@@ -11,5 +11,9 @@ logs
 # Environment
 *.env*
 
+# VSCode
+.vscode/
+.vscode/*
+
 # Misc
 .DS_Store
