@@ -1,5 +1,6 @@
 # Typescript Snake Game
 - Demo: [https://aaronlifton.github.io/typescript-snake/](https://aaronlifton.github.io/typescript-snake/)
+- Controls: WASD
 
 # Dev
 1. `yarn && yarn run start:dev`
