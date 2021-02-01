@@ -3,6 +3,8 @@ import Apple from "./sprites/Apple";
 import Trap from "./sprites/Trap";
 import Sprite from "./Sprite";
 import { Position, Block } from "./types";
+
+type Direction = "Up" | "Down" | "Right" | "Left"
 class Game {
   private canvas: HTMLCanvasElement;
   private cellSize = 20;
@@ -15,18 +17,19 @@ class Game {
   private lastTime: number;
   private startTime: number;
   private frameCount = 0;
-  private direction: "Up" | "Down" | "Right" | "Left";
+  private direction: Direction;
   private fps = 20;
   private fpsInterval = 1000 / this.fps;
   private apples: Apple[] = [];
-  private numApples = 10;
+  private numApples = 15;
   private traps: Trap[] = [];
-  private numTraps = 5;
+  private numTraps = 10;
   private gameStatus = "running";
   private animationFrameRequestId: number;
   private scale = 1;
   private startOverButton: HTMLButtonElement;
   private gradients: { [key: string]: CanvasGradient };
+  private lastDirection: Direction
 
   constructor() {
     this.setupDimensions();
@@ -107,18 +110,24 @@ class Game {
         this.isRunning = false;
         break;
       case "a":
+        if (this.lastDirection == "Right") return
         this.direction = "Left";
         break;
       case "s":
+        if (this.lastDirection == "Up") return
         this.direction = "Down";
         break;
       case "d":
+        if (this.lastDirection == "Left") return
         this.direction = "Right";
         break;
       case "w":
+        if (this.lastDirection == "Down") return
         this.direction = "Up";
         break;
     }
+
+    this.lastDirection = this.direction
   }
 
   moveInDirection() {
