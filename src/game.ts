@@ -1,126 +1,8 @@
-interface Position {
-  x: number;
-  y: number;
-}
-interface Block {
-  position: Position;
-  color?: string;
-}
-
-class Sprite {
-  constructor(public blocks: Block[] = []) {}
-
-  detectCollision(position: Position): boolean {
-    for (let i = 0; i < this.blocks.length; i++) {
-      if (
-        this.blocks[i].position.x == position.x &&
-        this.blocks[i].position.y == position.y
-      ) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  detectCollisionWithSprite(sprite: Sprite): boolean {
-    for (let i = 0; i < this.blocks.length; i++) {
-      for (let j = 0; j < sprite.blocks.length; j++) {
-        if (
-          this.blocks[i].position.x == sprite.blocks[j].position.x &&
-          this.blocks[i].position.y == sprite.blocks[j].position.y
-        ) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  detectCollisionWithBlock(block: Block): boolean {
-    for (let i = 0; i < this.blocks.length; i++) {
-      if (
-        this.blocks[i].position.x == block.position.x &&
-        this.blocks[i].position.y == block.position.y
-      ) {
-        return true;
-      }
-    }
-    return false;
-  }
-}
-
-class SingularSprite extends Sprite {
-  constructor(position: Position, color: string) {
-    super([{ position, color }]);
-  }
-
-  get block() {
-    return this.blocks[0];
-  }
-}
-
-class Player extends Sprite {
-  constructor(startPosition: Position, numBlocks: number) {
-    let blocks: Block[] = [];
-    for (let i = 0; i < numBlocks; i++) {
-      blocks.push({
-        position: { x: startPosition.x + i, y: startPosition.y + i },
-        color: "black",
-      });
-    }
-    super(blocks);
-  }
-
-  eat(block: Block) {
-    this.blocks.push({ ...block, color: "black" });
-  }
-
-  move(xOffset: number, yOffset: number) {
-    this.blocks = [
-      ...this.blocks.slice(1),
-      {
-        position: {
-          x: this.headBlock.position.x + xOffset,
-          y: this.headBlock.position.y + yOffset,
-        },
-        color: "black",
-      },
-    ];
-  }
-
-  moveTo(x: number, y: number) {
-    this.blocks = [
-      ...this.blocks.slice(1),
-      {
-        position: { x, y },
-        color: "black",
-      },
-    ];
-  }
-
-  detectCollisionWithSelf({ x, y }) {
-    return this.blocks.slice(1).some((block) => {
-      return block.position.x == x && block.position.y == y;
-    });
-  }
-
-  get headBlock(): Block {
-    return this.blocks[this.blocks.length - 1];
-  }
-}
-
-class Apple extends SingularSprite {
-  constructor(position: Position, color = "red") {
-    super(position, color);
-  }
-}
-
-class Trap extends SingularSprite {
-  constructor(position: Position, color = "#666666") {
-    super(position, color);
-  }
-}
-
+import Player from "./sprites/Player";
+import Apple from "./sprites/Apple";
+import Trap from "./sprites/Trap";
+import Sprite from "./Sprite";
+import { Position, Block } from "./types";
 class Game {
   private canvas: HTMLCanvasElement;
   private cellSize = 20;
@@ -144,6 +26,7 @@ class Game {
   private animationFrameRequestId: number;
   private scale = 1;
   private startOverButton: HTMLButtonElement;
+  private gradients: { [key: string]: CanvasGradient };
 
   constructor() {
     this.setupDimensions();
@@ -156,6 +39,7 @@ class Game {
     this.lastTime = window.performance.now();
     this.startTime = this.lastTime;
 
+    this.buildGradients();
     this.buildSprites();
 
     window.addEventListener("keydown", this.onKeyDown.bind(this), false);
@@ -255,22 +139,20 @@ class Game {
   }
 
   movePlayer(xOffset: number, yOffset: number) {
-    const newX = this.player.headBlock.position.x + xOffset;
-    const newY = this.player.headBlock.position.y + yOffset;
+    let { x, y } = this.player.positionWithOffset(xOffset, yOffset);
 
-    if (!this.checkState({ x: newX, y: newY })) return;
-
-    if (newX < 0) {
-      this.player.moveTo(this.cellsX - 1, newY);
-    } else if (newX > this.cellsX - 1) {
-      this.player.moveTo(0, newY);
-    } else if (newY < 0) {
-      this.player.moveTo(newX, this.cellsY - 1);
-    } else if (newY > this.cellsY - 1) {
-      this.player.moveTo(newX, 0);
-    } else {
-      this.player.move(xOffset, yOffset);
+    if (x < 0) {
+      x = this.cellsX - 1;
+    } else if (x > this.cellsX - 1) {
+      x = 0;
+    } else if (y < 0) {
+      y = this.cellsY - 1;
+    } else if (y > this.cellsY - 1) {
+      y = 0;
     }
+    if (!this.checkState({ x: x, y: y })) return;
+
+    this.player.moveTo(x, y);
   }
 
   runGameLoop(newTime?: number) {
@@ -318,7 +200,6 @@ class Game {
 
     const collidedWithSelf = this.player.detectCollisionWithSelf(position);
     if (collidedWithSelf) {
-      console.log({ position, headBlock: this.player.headBlock.position });
       this.lostGame();
       return false;
     }
@@ -339,15 +220,15 @@ class Game {
     window.cancelAnimationFrame(this.animationFrameRequestId);
   }
 
-  playerIsCollidedWithTrap({ x, y }) {
+  playerIsCollidedWithTrap(position: Position) {
     return this.traps.some((trap) => {
-      return trap.detectCollision({ x, y });
+      return trap.detectCollisionAtPosition(position);
     });
   }
 
-  playerIsCollidedWithApple({ x, y }) {
+  playerIsCollidedWithApple(position: Position) {
     return this.apples.find((apple) => {
-      return apple.detectCollision({ x, y });
+      return apple.detectCollisionAtPosition(position);
     });
   }
 
@@ -358,9 +239,9 @@ class Game {
   paint() {
     this.clearScreen();
     this.drawGrid(0, 0, this.width, this.height);
-    this.drawSprite(this.player);
-    this.apples.forEach((apple) => this.drawSprite(apple));
-    this.traps.forEach((trap) => this.drawSprite(trap));
+    this.drawSprite(this.player, "snakeGradient");
+    this.apples.forEach((apple) => this.drawSprite(apple, "appleGradient"));
+    this.traps.forEach((trap) => this.drawSprite(trap, "trapGradient"));
   }
 
   clearScreen() {
@@ -368,17 +249,58 @@ class Game {
     this.context.clearRect(0, 0, this.width, this.height);
   }
 
-  drawSprite(sprite: Sprite) {
+  buildGradients() {
+    const appleGradient = this.context.createLinearGradient(
+      0,
+      0,
+      this.width,
+      this.height,
+    );
+
+    appleGradient.addColorStop(0, "pink");
+    appleGradient.addColorStop(0.5, "red");
+    appleGradient.addColorStop(1, "crimson");
+
+    const trapGradient = this.context.createLinearGradient(
+      0,
+      0,
+      this.width,
+      this.height,
+    );
+
+    trapGradient.addColorStop(0, "grey");
+    trapGradient.addColorStop(0.5, "darkgrey");
+    trapGradient.addColorStop(1, "gainsboro");
+
+    const snakeGradient = this.context.createLinearGradient(
+      0,
+      0,
+      this.width,
+      this.height,
+    );
+
+    snakeGradient.addColorStop(0, "darkslategrey");
+    snakeGradient.addColorStop(0.5, "#333333");
+    snakeGradient.addColorStop(1, "black");
+
+    this.gradients = { appleGradient, trapGradient, snakeGradient };
+  }
+
+  drawSprite(sprite: Sprite, gradientStyle?: string) {
     sprite.blocks.forEach((block) => {
-      this.drawBlock(block.position.x, block.position.y, block.color);
+      this.drawBlock(block, gradientStyle);
     });
   }
 
-  drawBlock(x: number, y: number, color: string) {
-    this.context.fillStyle = color;
+  drawBlock(block: Block, gradientStyle?: string) {
+    if (gradientStyle) {
+      this.context.fillStyle = this.gradients[gradientStyle];
+    } else {
+      this.context.fillStyle = block.color;
+    }
     this.context.fillRect(
-      x * this.cellSize,
-      y * this.cellSize,
+      block.position.x * this.cellSize,
+      block.position.y * this.cellSize,
       this.cellSize,
       this.cellSize,
     );
